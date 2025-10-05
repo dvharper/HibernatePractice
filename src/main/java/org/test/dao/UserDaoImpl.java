@@ -18,28 +18,26 @@ public class UserDaoImpl implements UserDao {
     public void create(User user) {
         Transaction tx = null;
         try (Session session = HibernateUtil.getSessionFactory().openSession()) {
-
-            // Проверка существующего email
             User existing = session.createQuery(
                             "from User where email = :email", User.class)
                     .setParameter("email", user.getEmail())
                     .uniqueResult();
 
             if (existing != null) {
-                logger.warn("Пользователь с email={} уже существует!", user.getEmail());
+                logger.warn("User with email={} already exists!", user.getEmail());
                 return;
             }
 
             tx = session.beginTransaction();
             session.persist(user);
             tx.commit();
-            logger.info("Пользователь создан: {}", user);
+            logger.info("User created: {}", user);
 
         } catch (Exception e) {
             if (tx != null && tx.getStatus().canRollback()) {
                 tx.rollback();
             }
-            logger.error("Ошибка при создании пользователя", e);
+            logger.error("Creating error", e);
         }
     }
 
