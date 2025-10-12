@@ -1,51 +1,47 @@
 package org.test.app;
 
-import org.test.dao.UserDao;
 import org.test.dao.UserDaoImpl;
-import org.test.model.User;
-import org.test.util.HibernateUtil;
+import org.test.service.UserService;
+import org.test.model.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Scanner;
 
 public class Main {
 
-    private static final UserDao userDao = new UserDaoImpl();
     private static final Scanner scanner = new Scanner(System.in);
+    private static final UserDaoImpl userDao = new UserDaoImpl();
+    private static final UserService userService = new UserService(userDao);
 
     public static void main(String[] args) {
-        boolean running = true;
-
-        while (running) {
+        while (true) {
             printMenu();
             String choice = scanner.nextLine();
-
             switch (choice) {
                 case "1" -> createUser();
                 case "2" -> findUserById();
-                case "3" -> listAllUsers();
+                case "3" -> findAllUsers();
                 case "4" -> updateUser();
                 case "5" -> deleteUser();
                 case "0" -> {
-                    running = false;
-                    System.out.println("Shutting down...");
+                    System.out.println("Exiting...");
+                    return;
                 }
-                default -> System.out.println("Wrong choice. Try again!");
+                default -> System.out.println("Invalid option.");
             }
         }
-
-        HibernateUtil.shutdown();
     }
 
     private static void printMenu() {
-        System.out.println("\n--- Menu ---");
-        System.out.println("1. Create user");
-        System.out.println("2. Find user by ID");
-        System.out.println("3. Show all users");
-        System.out.println("4. Update user");
-        System.out.println("5. Delete user");
+        System.out.println("\n=== User Service Menu ===");
+        System.out.println("1. Create User");
+        System.out.println("2. Find User by ID");
+        System.out.println("3. List All Users");
+        System.out.println("4. Update User");
+        System.out.println("5. Delete User");
         System.out.println("0. Exit");
-        System.out.print(": ");
+        System.out.print("Choose an option: ");
     }
 
     private static void createUser() {
@@ -56,64 +52,65 @@ public class Main {
         System.out.print("Age: ");
         int age = Integer.parseInt(scanner.nextLine());
 
-        User user = new User(name, email, age);
-        userDao.create(user);
+        User user = userService.createUser(name, email, age);
+        System.out.println("Created: " + user);
     }
 
     private static void findUserById() {
         System.out.print("ID: ");
         long id = Long.parseLong(scanner.nextLine());
 
-        User user = userDao.findById(id);
-        if (user != null) {
+        try {
+            User user = userService.findUserById(id);
             System.out.println(user);
-        } else {
+        } catch (RuntimeException e) {
             System.out.println("User not found.");
         }
     }
 
-    private static void listAllUsers() {
-        List<User> users = userDao.findAll();
+    private static void findAllUsers() {
+        List<User> users = userService.getAllUsers();
         if (users.isEmpty()) {
-            System.out.println("Empty.");
+            System.out.println("No users found.");
         } else {
             users.forEach(System.out::println);
         }
     }
 
     private static void updateUser() {
-        System.out.print("ID to update: ");
+        System.out.print("ID of user to update: ");
         long id = Long.parseLong(scanner.nextLine());
 
-        User user = userDao.findById(id);
-        if (user == null) {
+        try {
+            User user = userService.findUserById(id);
+
+            System.out.print("New Name (current: " + user.getName() + "): ");
+            String name = scanner.nextLine();
+            if (!name.isBlank()) user.setName(name);
+
+            System.out.print("New Email (current: " + user.getEmail() + "): ");
+            String email = scanner.nextLine();
+            if (!email.isBlank()) user.setEmail(email);
+
+            System.out.print("New Age (current: " + user.getAge() + "): ");
+            String ageInput = scanner.nextLine();
+            if (!ageInput.isBlank()) user.setAge(Integer.parseInt(ageInput));
+
+            userService.updateUser(user);
+            System.out.println("Updated: " + user);
+        } catch (RuntimeException e) {
             System.out.println("User not found.");
-            return;
         }
-
-        System.out.print("New name (" + user.getName() + "): ");
-        String name = scanner.nextLine();
-        if (!name.isBlank()) user.setName(name);
-
-        System.out.print("New email (" + user.getEmail() + "): ");
-        String email = scanner.nextLine();
-        if (!email.isBlank()) user.setEmail(email);
-
-        System.out.print("New age (" + user.getAge() + "): ");
-        String ageInput = scanner.nextLine();
-        if (!ageInput.isBlank()) user.setAge(Integer.parseInt(ageInput));
-
-        userDao.update(user);
     }
 
     private static void deleteUser() {
-        System.out.print("ID to delete: ");
+        System.out.print("ID of user to delete: ");
         long id = Long.parseLong(scanner.nextLine());
 
-        User user = userDao.findById(id);
-        if (user != null) {
-            userDao.delete(user);
-        } else {
+        try {
+            userService.deleteUser(id);
+            System.out.println("User deleted.");
+        } catch (RuntimeException e) {
             System.out.println("User not found.");
         }
     }
