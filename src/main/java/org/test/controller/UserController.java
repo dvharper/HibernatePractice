@@ -1,5 +1,9 @@
 package org.test.controller;
 
+import org.springframework.hateoas.CollectionModel;
+import org.springframework.hateoas.EntityModel;
+import org.springframework.hateoas.Link;
+import org.springframework.hateoas.server.mvc.WebMvcLinkBuilder;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.test.dto.UserDto;
@@ -9,6 +13,8 @@ import org.test.service.UserService;
 
 import java.util.List;
 import java.util.stream.Collectors;
+
+import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.*;
 
 @RestController
 @RequestMapping("/users")
@@ -21,31 +27,55 @@ public class UserController {
     }
 
     @GetMapping
-    public List<UserDto> getAllUsers() {
-        return userService.getAllUsers()
+    public ResponseEntity<CollectionModel<EntityModel<UserDto>>> getAllUsers() {
+        List<EntityModel<UserDto>> users = userService.getAllUsers()
                 .stream()
                 .map(UserMapper::toDto)
+                .map(userDto -> EntityModel.of(userDto,
+                        linkTo(methodOn(UserController.class).getUserById(userDto.getId())).withSelfRel(),
+                        linkTo(methodOn(UserController.class).getAllUsers()).withRel("users")))
                 .collect(Collectors.toList());
+
+        return ResponseEntity.ok(
+                CollectionModel.of(users,
+                        linkTo(methodOn(UserController.class).getAllUsers()).withSelfRel())
+        );
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<UserDto> getUserById(@PathVariable("id") Long id) {
+    public ResponseEntity<EntityModel<UserDto>> getUserById(@PathVariable("id") Long id) {
         User user = userService.findUserById(id);
-        return ResponseEntity.ok(UserMapper.toDto(user));
+        UserDto dto = UserMapper.toDto(user);
+
+        EntityModel<UserDto> model = EntityModel.of(dto,
+                linkTo(methodOn(UserController.class).getUserById(id)).withSelfRel(),
+                linkTo(methodOn(UserController.class).getAllUsers()).withRel("users"),
+                linkTo(methodOn(UserController.class).updateUser(id, dto)).withRel("update"),
+                linkTo(methodOn(UserController.class).deleteUser(id)).withRel("delete")
+        );
+
+        return ResponseEntity.ok(model);
     }
 
     @PostMapping
-    public ResponseEntity<UserDto> createUser(@RequestBody UserDto userDto) {
+    public ResponseEntity<EntityModel<UserDto>> createUser(@RequestBody UserDto userDto) {
         User created = userService.createUser(
                 userDto.getName(),
                 userDto.getEmail(),
                 userDto.getAge()
         );
-        return ResponseEntity.ok(UserMapper.toDto(created));
+
+        UserDto dto = UserMapper.toDto(created);
+        EntityModel<UserDto> model = EntityModel.of(dto,
+                linkTo(methodOn(UserController.class).getUserById(dto.getId())).withSelfRel(),
+                linkTo(methodOn(UserController.class).getAllUsers()).withRel("users")
+        );
+
+        return ResponseEntity.ok(model);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<UserDto> updateUser(
+    public ResponseEntity<EntityModel<UserDto>> updateUser(
             @PathVariable("id") Long id,
             @RequestBody UserDto userDto
     ) {
@@ -55,7 +85,14 @@ public class UserController {
         existing.setAge(userDto.getAge());
 
         userService.updateUser(existing);
-        return ResponseEntity.ok(UserMapper.toDto(existing));
+
+        UserDto dto = UserMapper.toDto(existing);
+        EntityModel<UserDto> model = EntityModel.of(dto,
+                linkTo(methodOn(UserController.class).getUserById(id)).withSelfRel(),
+                linkTo(methodOn(UserController.class).getAllUsers()).withRel("users")
+        );
+
+        return ResponseEntity.ok(model);
     }
 
     @DeleteMapping("/{id}")
